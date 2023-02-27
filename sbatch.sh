@@ -20,7 +20,7 @@ export LS=0
 
 run_singularity ()
 {
-singularity exec --nv --writable-tmpfs -B /usr/lib64 -B /var/lib/dcv-gl --overlay /global/scratch/users/katiekang1998/singularity/overlay-50G-10M.ext3:ro /global/scratch/users/katiekang1998/singularity/cudagl11.5-cudnn8-devel-ubuntu18.04.sif /bin/bash -c "
+singularity exec --nv --writable-tmpfs -B /usr/lib64 -B /var/lib/dcv-gl --overlay /global/scratch/users/katiekang1998/overlay-50G-10M.ext3:ro /global/scratch/users/katiekang1998/singularity/cudagl11.5-cudnn8-devel-ubuntu18.04.sif /bin/bash -c "
     source /ext3/env.sh
     source ~/.bashrc
     export WANDB_API_KEY=54a52e9f0fbaeef9f587192e3ee5425a7c7e2995
