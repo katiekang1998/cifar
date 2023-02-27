@@ -34,5 +34,20 @@ singularity exec --nv --writable-tmpfs -B /usr/lib64 -B /var/lib/dcv-gl --overla
 "
 }
 
-export -f run_singularity
-parallel --delay 20 --linebuffer -j 3 run_singularity {1} ::: 1 2
+run_singularity_rl ()
+{
+singularity exec --nv --writable-tmpfs -B /usr/lib64 -B /var/lib/dcv-gl --overlay /global/scratch/users/katiekang1998/overlay-50G-10M.ext3:ro /global/scratch/users/katiekang1998/singularity/cudagl11.5-cudnn8-devel-ubuntu18.04.sif /bin/bash -c "
+    source /ext3/env.sh
+    source ~/.bashrc
+    export WANDB_API_KEY=54a52e9f0fbaeef9f587192e3ee5425a7c7e2995
+    conda activate cifar10
+    export XLA_FLAGS=--xla_gpu_force_compilation_parallelism=1
+    XLA_PYTHON_CLIENT_PREALLOCATE=false python $PROJECT_DIR/trainer_rl.py \
+        --seed=$1 \
+        --save-dir=rl_mc4_seed$1 \
+        --misspecification-cost=4 \
+"
+}
+
+export -f run_singularity_rl
+parallel --delay 20 --linebuffer -j 2 run_singularity {1} ::: 1 2
