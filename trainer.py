@@ -73,8 +73,8 @@ def main():
 
 
     # Check the save_dir exists or not
-    if not os.path.exists(args.save_dir):
-        os.makedirs(args.save_dir)
+    if not os.path.exists(os.path.join("data", args.save_dir)):
+        os.makedirs(os.path.join("data", args.save_dir))
 
     model = torch.nn.DataParallel(resnet.__dict__[args.arch]())
     model.cuda()
