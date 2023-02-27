@@ -12,6 +12,7 @@ import torch.utils.data
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import resnet
+from custom_datasets import CIFAR10C
 
 model_names = sorted(name for name in resnet.__dict__
     if name.islower() and not name.startswith("__")
@@ -21,7 +22,8 @@ model_names = sorted(name for name in resnet.__dict__
 print(model_names)
 
 parser = argparse.ArgumentParser(description='Propert ResNets for CIFAR10 in pytorch')
-parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet32',
+parser.add_argument('--seed', dest='seed', type=int, default=48)
+parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet20',
                     choices=model_names,
                     help='model architecture: ' + ' | '.join(model_names) +
                     ' (default: resnet32)')
@@ -39,6 +41,8 @@ parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
 parser.add_argument('--weight-decay', '--wd', default=1e-4, type=float,
                     metavar='W', help='weight decay (default: 1e-4)')
+parser.add_argument('--label-smoothing', '--ls', default=0.0, type=float,
+                    metavar='LS', help='label smoothing')
 parser.add_argument('--print-freq', '-p', default=50, type=int,
                     metavar='N', help='print frequency (default: 50)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
@@ -55,12 +59,17 @@ parser.add_argument('--save-dir', dest='save_dir',
 parser.add_argument('--save-every', dest='save_every',
                     help='Saves checkpoints at every specified number of epochs',
                     type=int, default=10)
+parser.add_argument('--corruption-type', dest='corruption_type',
+                    help='Type of corruption to add to evaluation images',
+                    type=str, default="impulse_noise")
 best_prec1 = 0
 
 
 def main():
     global args, best_prec1
     args = parser.parse_args()
+
+    torch.manual_seed(args.seed)
 
 
     # Check the save_dir exists or not
@@ -106,12 +115,31 @@ def main():
         batch_size=128, shuffle=False,
         num_workers=args.workers, pin_memory=True)
 
+
+
+    valc_loaders = []
+    corruption_type = args.corruption_type
+    for corruption_level in range(5):
+        valc_loader = torch.utils.data.DataLoader(
+            CIFAR10C(corruption_type, corruption_level, transform=transforms.Compose([
+                transforms.ToTensor(),
+                normalize,
+            ])),
+            batch_size=128, shuffle=False,
+            num_workers=args.workers, pin_memory=True)
+        valc_loaders.append(valc_loader)
+
+
     # define loss function (criterion) and optimizer
-    criterion = nn.CrossEntropyLoss().cuda()
+    criterion = nn.CrossEntropyLoss(label_smoothing=args.label_smoothing).cuda()
 
     if args.half:
         model.half()
         criterion.half()
+
+    if args.evaluate:
+        validate(val_loader, model, criterion)
+        return
 
     optimizer = torch.optim.SGD(model.parameters(), args.lr,
                                 momentum=args.momentum,
@@ -127,9 +155,7 @@ def main():
             param_group['lr'] = args.lr*0.1
 
 
-    if args.evaluate:
-        validate(val_loader, model, criterion)
-        return
+
 
     for epoch in range(args.start_epoch, args.epochs):
 
@@ -139,7 +165,12 @@ def main():
         lr_scheduler.step()
 
         # evaluate on validation set
+        print("0")
         prec1 = validate(val_loader, model, criterion)
+
+        for corruption_level in range(5):
+            print(corruption_level+1)
+            validate(valc_loaders[corruption_level], model, criterion)
 
         # remember best prec@1 and save checkpoint
         is_best = prec1 > best_prec1
@@ -150,12 +181,12 @@ def main():
                 'epoch': epoch + 1,
                 'state_dict': model.state_dict(),
                 'best_prec1': best_prec1,
-            }, is_best, filename=os.path.join(args.save_dir, 'checkpoint.th'))
+            }, is_best, filename=os.path.join("data", args.save_dir, 'checkpoint.th'))
 
         save_checkpoint({
             'state_dict': model.state_dict(),
             'best_prec1': best_prec1,
-        }, is_best, filename=os.path.join(args.save_dir, 'model.th'))
+        }, is_best, filename=os.path.join("data", args.save_dir, 'model.th'))
 
 
 def train(train_loader, model, criterion, optimizer, epoch):
@@ -249,16 +280,15 @@ def validate(val_loader, model, criterion):
             batch_time.update(time.time() - end)
             end = time.time()
 
-            if i % args.print_freq == 0:
-                print('Test: [{0}/{1}]\t'
-                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                      'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
-                          i, len(val_loader), batch_time=batch_time, loss=losses,
-                          top1=top1))
+        print('Test: [{0}/{1}]\t'
+              'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+              'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+              'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
+                  i, len(val_loader), batch_time=batch_time, loss=losses,
+                  top1=top1))
 
-    print(' * Prec@1 {top1.avg:.3f}'
-          .format(top1=top1))
+    # print(' * Prec@1 {top1.avg:.3f}'
+    #       .format(top1=top1))
 
     return top1.avg
 
