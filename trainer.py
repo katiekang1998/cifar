@@ -13,6 +13,7 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import resnet
 from custom_datasets import CIFAR10C
+import wandb
 
 model_names = sorted(name for name in resnet.__dict__
     if name.islower() and not name.startswith("__")
@@ -59,9 +60,9 @@ parser.add_argument('--save-dir', dest='save_dir',
 parser.add_argument('--save-every', dest='save_every',
                     help='Saves checkpoints at every specified number of epochs',
                     type=int, default=10)
-parser.add_argument('--corruption-type', dest='corruption_type',
-                    help='Type of corruption to add to evaluation images',
-                    type=str, default="impulse_noise")
+# parser.add_argument('--corruption-type', dest='corruption_type',
+#                     help='Type of corruption to add to evaluation images',
+#                     type=str, default="impulse_noise")
 best_prec1 = 0
 
 
@@ -70,6 +71,9 @@ def main():
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
+
+    run = wandb.init(project="cifar10", name=args.save_dir)
+    wandb.config.update(args)
 
 
     # Check the save_dir exists or not
@@ -117,17 +121,17 @@ def main():
 
 
 
-    valc_loaders = []
-    corruption_type = args.corruption_type
-    for corruption_level in range(5):
-        valc_loader = torch.utils.data.DataLoader(
-            CIFAR10C(corruption_type, corruption_level, transform=transforms.Compose([
-                transforms.ToTensor(),
-                normalize,
-            ])),
-            batch_size=128, shuffle=False,
-            num_workers=args.workers, pin_memory=True)
-        valc_loaders.append(valc_loader)
+    # valc_loaders = []
+    # corruption_type = args.corruption_type
+    # for corruption_level in range(5):
+    #     valc_loader = torch.utils.data.DataLoader(
+    #         CIFAR10C(corruption_type, corruption_level, transform=transforms.Compose([
+    #             transforms.ToTensor(),
+    #             normalize,
+    #         ])),
+    #         batch_size=128, shuffle=False,
+    #         num_workers=args.workers, pin_memory=True)
+    #     valc_loaders.append(valc_loader)
 
 
     # define loss function (criterion) and optimizer
@@ -168,9 +172,9 @@ def main():
         print("0")
         prec1 = validate(val_loader, model, criterion)
 
-        for corruption_level in range(5):
-            print(corruption_level+1)
-            validate(valc_loaders[corruption_level], model, criterion)
+        # for corruption_level in range(5):
+        #     print(corruption_level+1)
+        #     validate(valc_loaders[corruption_level], model, criterion)
 
         # remember best prec@1 and save checkpoint
         is_best = prec1 > best_prec1
@@ -242,6 +246,9 @@ def train(train_loader, model, criterion, optimizer, epoch):
                       epoch, i, len(train_loader), batch_time=batch_time,
                       data_time=data_time, loss=losses, top1=top1))
 
+            wandb.log({f'train/loss': float(losses.avg)}, step=epoch*len(train_loader)+i)
+            wandb.log({f'train/accuracy': float(top1.avg)}, step=epoch*len(train_loader)+i)
+
 
 def validate(val_loader, model, criterion):
     """
@@ -286,6 +293,9 @@ def validate(val_loader, model, criterion):
               'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
                   i, len(val_loader), batch_time=batch_time, loss=losses,
                   top1=top1))
+
+        wandb.log({f'test/loss': float(losses.avg)})
+        wandb.log({f'test/accuracy': float(top1.avg)})
 
     # print(' * Prec@1 {top1.avg:.3f}'
     #       .format(top1=top1))

@@ -23,6 +23,7 @@ model_names = sorted(name for name in resnet.__dict__
 print(model_names)
 
 parser = argparse.ArgumentParser(description='Propert ResNets for CIFAR10 in pytorch')
+parser.add_argument('--seed', dest='seed', type=int, default=48)
 parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet20',
                     choices=model_names,
                     help='model architecture: ' + ' | '.join(model_names) +
@@ -57,9 +58,9 @@ parser.add_argument('--save-dir', dest='save_dir',
 parser.add_argument('--save-every', dest='save_every',
                     help='Saves checkpoints at every specified number of epochs',
                     type=int, default=10)
-parser.add_argument('--corruption-type', dest='corruption_type',
-                    help='Type of corruption to add to evaluation images',
-                    type=str, default="impulse_noise")
+# parser.add_argument('--corruption-type', dest='corruption_type',
+#                     help='Type of corruption to add to evaluation images',
+#                     type=str, default="impulse_noise")
 parser.add_argument('--misspecification-cost', dest='misspecification_cost',
                     type=int, default=1)
 best_prec1 = 0
@@ -80,7 +81,11 @@ def main():
     global args, best_prec1
     args = parser.parse_args()
 
-    run = wandb.init(project="cifar10_rl", name=args.corruption_type)
+
+    torch.manual_seed(args.seed)
+
+    run = wandb.init(project="cifar10_rl", name=args.save_dir)
+    wandb.config.update(args)
 
 
 
@@ -127,20 +132,19 @@ def main():
         batch_size=128, shuffle=False,
         num_workers=args.workers, pin_memory=True)
 
-    valc_loaders = []
-    for corruption_level in range(5):
-        valc_loader = torch.utils.data.DataLoader(
-            CIFAR10C(args.corruption_type, corruption_level, transform=transforms.Compose([
-                transforms.ToTensor(),
-                normalize,
-            ])),
-            batch_size=128, shuffle=False,
-            num_workers=args.workers, pin_memory=True)
-        valc_loaders.append(valc_loader)
+    # valc_loaders = []
+    # for corruption_level in range(5):
+    #     valc_loader = torch.utils.data.DataLoader(
+    #         CIFAR10C(args.corruption_type, corruption_level, transform=transforms.Compose([
+    #             transforms.ToTensor(),
+    #             normalize,
+    #         ])),
+    #         batch_size=128, shuffle=False,
+    #         num_workers=args.workers, pin_memory=True)
+    #     valc_loaders.append(valc_loader)
 
 
     # define loss function (criterion) and optimizer
-    # criterion = nn.CrossEntropyLoss().cuda()
     criterion = get_rl_loss(args.misspecification_cost)#rl_loss
 
 
@@ -177,9 +181,9 @@ def main():
         print("0")
         prec1 = validate(val_loader, model, criterion, 0)
 
-        for corruption_level in range(5):
-            print(corruption_level+1)
-            validate(valc_loaders[corruption_level], model, criterion, corruption_level+1)
+        # for corruption_level in range(5):
+        #     print(corruption_level+1)
+        #     validate(valc_loaders[corruption_level], model, criterion, corruption_level+1)
 
         # remember best prec@1 and save checkpoint
         is_best = prec1 > best_prec1
