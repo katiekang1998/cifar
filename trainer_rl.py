@@ -302,9 +302,11 @@ def validate(val_loader, model, criterion, corruption_level):
                 outputs[action_idx].update(output.mean(axis=0)[action_idx], input.size(0))
             output_best_digit.update(output[:, :-1].max(axis=-1)[0].mean(), input.size(0))
 
+
             one_hot = nn.functional.one_hot(target_var.to(torch.int64), 11)
-            reward_all = 2*one_hot-1
-            reward_all[:, -1] = 0
+            reward = (args.misspecification_cost+1)*one_hot - args.misspecification_cost
+            reward[:, -1] = 0
+
             best_actions = output.argmax(axis=-1)
             reward.update(torch.mean(torch.gather(reward_all, -1, best_actions.unsqueeze(-1)).type(torch.DoubleTensor)), input.size(0))
 

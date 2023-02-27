@@ -30,6 +30,7 @@ singularity exec --nv --writable-tmpfs -B /usr/lib64 -B /var/lib/dcv-gl --overla
         --seed=$1 \
         --ls=$LS \
         --save-dir=xent_ls${LS}_seed$1 \
+        --misspecification-cost=4 \
 "
 }
 

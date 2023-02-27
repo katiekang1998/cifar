@@ -63,6 +63,9 @@ parser.add_argument('--save-every', dest='save_every',
 # parser.add_argument('--corruption-type', dest='corruption_type',
 #                     help='Type of corruption to add to evaluation images',
 #                     type=str, default="impulse_noise")
+
+parser.add_argument('--misspecification-cost', dest='misspecification_cost',
+                    type=int, default=1)
 best_prec1 = 0
 
 
@@ -257,6 +260,7 @@ def validate(val_loader, model, criterion):
     batch_time = AverageMeter()
     losses = AverageMeter()
     top1 = AverageMeter()
+    reward = AverageMeter()
 
     # switch to evaluate mode
     model.eval()
@@ -278,6 +282,16 @@ def validate(val_loader, model, criterion):
             output = output.float()
             loss = loss.float()
 
+            threshold = args.misspecification_cost/(1+args.misspecification_cost)
+            one_hot = nn.functional.one_hot(target_var.to(torch.int64), 11)
+            reward_all = (args.misspecification_cost+1)*one_hot - args.misspecification_cost
+            reward_all[:, -1] = 0
+            output_dist_max, best_actions = nn.functional.softmax(output, dim=-1).max(axis=-1)
+            certain = (output_dist_max > threshold).to(torch.int64).cuda()
+            actions = certain*best_actions + (1-certain)*torch.ones(best_actions.shape).cuda()*10
+            reward.update(torch.mean(torch.gather(reward_all, -1, actions.to(torch.int64).unsqueeze(-1)).type(torch.DoubleTensor)), input.size(0))
+
+
             # measure accuracy and record loss
             prec1 = accuracy(output.data, target)[0]
             losses.update(loss.item(), input.size(0))
@@ -296,6 +310,7 @@ def validate(val_loader, model, criterion):
 
         wandb.log({f'test/loss': float(losses.avg)})
         wandb.log({f'test/accuracy': float(top1.avg)})
+        wandb.log({f'test/reward_mc{args.misspecification_cost}': float(reward.avg)})
 
     # print(' * Prec@1 {top1.avg:.3f}'
     #       .format(top1=top1))
