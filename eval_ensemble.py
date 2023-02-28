@@ -18,7 +18,7 @@ import numpy as np
 
 parser = argparse.ArgumentParser(description='Propert ResNets for CIFAR10 in pytorch')
 
-parser.add_argument('--run-name', dest='run_name',
+parser.add_argument('--run-name-prefix', dest='run_name_prefix',
                     type=str, default="")
 parser.add_argument('--corruption-type', dest='corruption_type',
                     help='Type of corruption to add to evaluation images',
@@ -26,24 +26,28 @@ parser.add_argument('--corruption-type', dest='corruption_type',
 parser.add_argument('--misspecification-cost', dest='misspecification_cost',
                     type=int, default=1)
 args = parser.parse_args()
-run_name = args.run_name
 corruption_type = args.corruption_type
 misspecification_cost = args.misspecification_cost
 
-xent = "xent" in run_name
-checkpoint_name = "data/"+run_name+"/checkpoint.th"
+xent = "xent" in args.run_name_prefix
+run_names = [f for f in os.listdir("data") if args.run_name_prefix+"_seed" in f]
 
-if xent:
-    model = torch.nn.DataParallel(resnet.__dict__['resnet20']())
-else:
-    model = torch.nn.DataParallel(resnet.__dict__['resnet20'](11))
-model.cuda()
+models = []
+for run_name in run_names:
+    checkpoint_name = "data/"+run_name+"/checkpoint.th"
 
-print("=> loading checkpoint '{}'".format(checkpoint_name))
-checkpoint = torch.load(checkpoint_name)
-start_epoch = checkpoint['epoch']
-best_prec1 = checkpoint['best_prec1']
-model.load_state_dict(checkpoint['state_dict'])
+    if xent:
+        model = torch.nn.DataParallel(resnet.__dict__['resnet20']())
+    else:
+        model = torch.nn.DataParallel(resnet.__dict__['resnet20'](11))
+    model.cuda()
+
+    print("=> loading checkpoint '{}'".format(checkpoint_name))
+    checkpoint = torch.load(checkpoint_name)
+    start_epoch = checkpoint['epoch']
+    best_prec1 = checkpoint['best_prec1']
+    model.load_state_dict(checkpoint['state_dict'])
+    models.append(model)
 
 normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225])
@@ -70,10 +74,12 @@ for corruption_level in range(5):
     valc_loaders.append(valc_loader)
 
 
-def validate(val_loader, model, use_threshold):
+def validate(val_loader, models, use_threshold):
     threshold = misspecification_cost/(1+misspecification_cost)
     # switch to evaluate mode
-    model.eval()
+
+    for model in models:
+        model.eval()
 
     reward = AverageMeter()
     accuracy = AverageMeter()
@@ -85,7 +91,15 @@ def validate(val_loader, model, use_threshold):
             input_var = input.cuda()
             target_var = target.cuda()
             # compute output
-            output = model(input_var)
+
+            output = []
+            for model in models:
+                output_i = model(input_var)
+                if len(output)==0:
+                    output = output_i.unsqueeze(axis=0)
+                else:
+                    output = torch.cat([output, output_i.unsqueeze(axis=0)], axis=0)
+            output = output.mean(axis=0)
             output = output.float()
 
             one_hot = nn.functional.one_hot(target_var.to(torch.int64), 11)
@@ -117,15 +131,17 @@ results["a10_ratio"] = np.zeros(6)
 
 print(xent)
 
-results["reward"][0], results["accuracy"][0], results["a10_ratio"][0] = validate(val_loader, model, xent)
+results["reward"][0], results["accuracy"][0], results["a10_ratio"][0] = validate(val_loader, models, xent)
 
 for _ in range(5):
-    results["reward"][_+1], results["accuracy"][_+1], results["a10_ratio"][_+1] = validate(valc_loaders[_], model, xent)
+    results["reward"][_+1], results["accuracy"][_+1], results["a10_ratio"][_+1] = validate(valc_loaders[_], models, xent)
 
 print(results)
 
 import pickle
 
+if not os.path.exists("data/"+args.run_name_prefix+"_ensemble_eval/"):
+    os.makedirs("data/"+args.run_name_prefix+"_ensemble_eval/")
 
-with open("data/"+run_name+"/"+corruption_type+'_mc'+str(misspecification_cost)+'.pkl', 'wb') as f:
+with open("data/"+args.run_name_prefix+"_ensemble_eval/"+corruption_type+'_mc'+str(misspecification_cost)+'.pkl', 'wb') as f:
     pickle.dump(results, f)

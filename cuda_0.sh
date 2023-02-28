@@ -1,5 +1,5 @@
 
-for RUN_NAME in rl_mc8
+for RUN_NAME in xent_ls0.05_seed1 xent_ls0.05_seed2 xent_ls0.05_seed3 xent_ls0.05_seed4 xent_ls0.05_seed5 xent_ls0.05_seed6
 do
 	for CORRUPTION_TYPE in impulse_noise shot_noise defocus_blur motion_blur speckle_noise
 	do

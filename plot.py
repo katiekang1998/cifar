@@ -2,12 +2,12 @@ import matplotlib.pyplot as plt
 import pickle
 
 corruption_types = ["impulse_noise", "shot_noise", "defocus_blur", "motion_blur", "speckle_noise"]
-appdx = "_mc2"
+appdx = "_mc4"
 
 f, ax = plt.subplots(len(corruption_types), 3, figsize=(3*6, 4*len(corruption_types)))
-for run_name in ["rl_mc2", "xent", "xent_ls0pt1", "xent_ls0pt05", "xent_ls0pt03", "xent_ls0pt01", "rl_mc4"]:
+for run_name in ["rl_mc4_seed1", "xent_ls0.05_seed1"]:
 	for corruption_type_idx in range(len(corruption_types)): 
-		with open(run_name+"/"+corruption_types[corruption_type_idx]+appdx+'.pkl', 'rb') as f:
+		with open("data/"+run_name+"/"+corruption_types[corruption_type_idx]+appdx+'.pkl', 'rb') as f:
 		    results = pickle.load(f)
 		ax[corruption_type_idx][0].plot([0, 1, 2, 3, 4, 5], results["reward"], label = run_name)
 		ax[corruption_type_idx][0].set_title(corruption_types[corruption_type_idx])
