@@ -5,7 +5,7 @@ corruption_types = ["impulse_noise", "shot_noise", "defocus_blur", "motion_blur"
 appdx = "_mc4"
 
 f, ax = plt.subplots(len(corruption_types), 3, figsize=(3*6, 4*len(corruption_types)))
-for run_name in ["rl_mc4_seed1", "rl_mc4_seed2", "rl_mc4_seed3", "rl_mc4_seed4", "rl_mc4_seed5", "rl_mc4_seed6", 
+for run_name in ["rl_mc4_ls0.05_seed1", "rl_mc4_ls0.05_seed2", #"rl_mc4_seed3", "rl_mc4_seed4", "rl_mc4_seed5", "rl_mc4_seed6", 
 "xent_ls0.05_seed1", "xent_ls0.05_seed2", "xent_ls0.05_seed3", "xent_ls0.05_seed4", "xent_ls0.05_seed5", "xent_ls0.05_seed6"]:
 
 # for run_name in ["rl_mc4_ensemble_eval", "xent_ls0._ensemble_eval"]:

@@ -14,6 +14,8 @@ import torchvision.datasets as datasets
 import resnet
 from custom_datasets import CIFAR10C
 import wandb
+import numpy as np
+import random
 
 model_names = sorted(name for name in resnet.__dict__
     if name.islower() and not name.startswith("__")
@@ -74,6 +76,11 @@ def main():
     args = parser.parse_args()
 
     torch.manual_seed(args.seed)
+    torch.cuda.manual_seed(args.seed)
+    np.random.seed(args.seed)
+    random.seed(args.seed)
+
+    torch.backends.cudnn.deterministic=True
 
     run = wandb.init(project="cifar10", name=args.save_dir)
     wandb.config.update(args)
