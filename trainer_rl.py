@@ -63,16 +63,20 @@ parser.add_argument('--save-every', dest='save_every',
 #                     type=str, default="impulse_noise")
 parser.add_argument('--misspecification-cost', dest='misspecification_cost',
                     type=int, default=1)
-parser.add_argument('--mc-bonus', dest='mc_bonus',
-                    type=float, default=0)
+parser.add_argument('--label-smoothing', '--ls', default=0.0, type=float,
+                    metavar='LS', help='label smoothing')
 best_prec1 = 0
 
 
-def get_rl_loss(misspecification_cost, mc_bonus):
+def get_rl_loss(misspecification_cost, label_smoothing):
     def rl_loss(output, target_var):
         one_hot = nn.functional.one_hot(target_var.to(torch.int64), 11)
         # reward = 2*one_hot-1
-        reward = (misspecification_cost+mc_bonus+1)*one_hot - misspecification_cost - mc_bonus
+        reward = (misspecification_cost+1)*one_hot - misspecification_cost
+
+        ls_reward = 0.1*1-0.9*misspecification_cost
+
+        reward = (1-label_smoothing)*reward + label_smoothing * ls_reward
         reward[:, -1] = 0
         loss = torch.mean((output-reward)**2)
         return loss
@@ -147,7 +151,7 @@ def main():
 
 
     # define loss function (criterion) and optimizer
-    criterion = get_rl_loss(args.misspecification_cost, args.mc_bonus)#rl_loss
+    criterion = get_rl_loss(args.misspecification_cost, args.label_smoothing)#rl_loss
 
 
     if args.half:
