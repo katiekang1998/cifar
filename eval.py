@@ -25,6 +25,8 @@ parser.add_argument('--corruption-type', dest='corruption_type',
                     type=str, default="impulse_noise")
 parser.add_argument('--misspecification-cost', dest='misspecification_cost',
                     type=int, default=1)
+parser.add_argument('--temperature', dest='temperature',
+                    type=float, default=1.)
 args = parser.parse_args()
 run_name = args.run_name
 corruption_type = args.corruption_type
@@ -87,6 +89,12 @@ def validate(val_loader, model, use_threshold):
             # compute output
             output = model(input_var)
             output = output.float()
+            if use_threshold:
+                output = output/args.temperature
+            # else:
+            #     prob = ((output[:, :-1]+misspecification_cost)/(1+misspecification_cost)).clip(min=0.00000001)
+            #     prob_ts = nn.functional.softmax(torch.log(prob)/args.temperature, dim=-1)
+            #     output[:, :-1] = (1+misspecification_cost)*prob_ts- misspecification_cost
 
             one_hot = nn.functional.one_hot(target_var.to(torch.int64), 11)
             reward_all = (misspecification_cost+1)*one_hot - misspecification_cost
@@ -127,5 +135,5 @@ print(results)
 import pickle
 
 
-with open("data/"+run_name+"/"+corruption_type+'_mc'+str(misspecification_cost)+'.pkl', 'wb') as f:
+with open("data/"+run_name+"/"+corruption_type+'_mc'+str(misspecification_cost)+'_ts'+str(args.temperature)+'.pkl', 'wb') as f:
     pickle.dump(results, f)

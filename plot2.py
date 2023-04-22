@@ -5,8 +5,11 @@ import numpy as np
 corruption_types = ["impulse_noise", "shot_noise", "defocus_blur", "motion_blur", "speckle_noise"]
 # rl_run_names = ["rl_mc4_ls0.05_seed1", "rl_mc4_ls0.05_seed2"]
 # xent_run_names = ["xent_ls0.05_seed1", "xent_ls0.05_seed2", "xent_ls0.05_seed3", "xent_ls0.05_seed4", "xent_ls0.05_seed5", "xent_ls0.05_seed6"]
-rl_run_names = ["rl_mc4_seed"+str(_) for _ in range(1, 7)]
-xent_run_names = ["xent_ls0._seed"+str(_) for _ in range(1, 7)]
+
+rl_predix = "rl_mc4"
+xent_prefix = "xent_ls0.05"
+rl_run_names = [rl_predix+"_seed"+str(_) for _ in range(1, 7)]
+xent_run_names = [xent_prefix+"_seed"+str(_) for _ in range(1, 7)]
 
 appdx = "_mc4"
 
@@ -20,7 +23,7 @@ for corruption_type_idx in range(len(corruption_types)):
 		    results = pickle.load(f)
 		    rewards_all.append(results["reward"])
 	rewards_all = np.array(rewards_all)
-	ax[corruption_type_idx].plot([0,1,2,3,4,5], rewards_all.mean(axis=0), c="C0", label = "rl")
+	ax[corruption_type_idx].plot([0,1,2,3,4,5], rewards_all.mean(axis=0), c="C0", label = rl_predix)
 	ax[corruption_type_idx].fill_between([0,1,2,3,4,5], rewards_all.mean(axis=0)-rewards_all.std(axis=0), rewards_all.mean(axis=0)+rewards_all.std(axis=0), color="C0", alpha=0.2)
 
 	rewards_all = []
@@ -29,9 +32,13 @@ for corruption_type_idx in range(len(corruption_types)):
 		    results = pickle.load(f)
 		    rewards_all.append(results["reward"])
 	rewards_all = np.array(rewards_all)
-	ax[corruption_type_idx].plot([0,1,2,3,4,5], rewards_all.mean(axis=0), c="C1", label = "xent")
+	ax[corruption_type_idx].plot([0,1,2,3,4,5], rewards_all.mean(axis=0), c="C1", label = xent_prefix)
 	ax[corruption_type_idx].fill_between([0,1,2,3,4,5], rewards_all.mean(axis=0)-rewards_all.std(axis=0), rewards_all.mean(axis=0)+rewards_all.std(axis=0), color="C1", alpha=0.2)
 
-plt.legend()
+	ax[corruption_type_idx].set_title(corruption_types[corruption_type_idx])
+	ax[corruption_type_idx].set_ylabel("reward")
+	ax[corruption_type_idx].legend()
+
+# plt.legend()
 plt.show()
 

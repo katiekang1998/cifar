@@ -3,3 +3,6 @@ data/
 pretrained_models/
 wandb/
 logs/
+model_best.pth.tar
+save_temp/
+
