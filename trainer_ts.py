@@ -22,7 +22,7 @@ from torch.nn import functional as F
 
 parser = argparse.ArgumentParser(description='Propert ResNets for CIFAR10 in pytorch')
 
-parser.add_argument('--run-name-prefix', dest='run_name_prefix',
+parser.add_argument('--run-name', dest='run_name',
                     type=str, default="")
 parser.add_argument('--corruption-type', dest='corruption_type',
                     help='Type of corruption to add to evaluation images',
@@ -31,25 +31,19 @@ parser.add_argument('--corruption-level', dest='corruption_level',
                     type=int, default=0)
 args = parser.parse_args()
 
-xent = "xent" in args.run_name_prefix
-run_names = [f for f in os.listdir("data") if args.run_name_prefix+"_seed" in f]
+run_name = args.run_name
 
-models = []
-for run_name in run_names:
-    checkpoint_name = "data/"+run_name+"/checkpoint.th"
 
-    if xent:
-        model = torch.nn.DataParallel(resnet.__dict__['resnet20']())
-    else:
-        model = torch.nn.DataParallel(resnet.__dict__['resnet20'](11))
-    model.cuda()
+checkpoint_name = "data/"+run_name+"/checkpoint.th"
 
-    print("=> loading checkpoint '{}'".format(checkpoint_name))
-    checkpoint = torch.load(checkpoint_name)
-    start_epoch = checkpoint['epoch']
-    best_prec1 = checkpoint['best_prec1']
-    model.load_state_dict(checkpoint['state_dict'])
-    models.append(model)
+model = torch.nn.DataParallel(resnet.__dict__['resnet20']())
+model.cuda()
+
+print("=> loading checkpoint '{}'".format(checkpoint_name))
+checkpoint = torch.load(checkpoint_name)
+start_epoch = checkpoint['epoch']
+best_prec1 = checkpoint['best_prec1']
+model.load_state_dict(checkpoint['state_dict'])
 
 normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406],
                                  std=[0.229, 0.224, 0.225])
@@ -60,7 +54,7 @@ if args.corruption_type == "":
             transforms.ToTensor(),
             normalize,
         ])),
-        batch_size=128, shuffle=False,
+        batch_size=128, shuffle=True,
         num_workers=4, pin_memory=True)
 else:
     val_loader = torch.utils.data.DataLoader(
@@ -68,7 +62,7 @@ else:
             transforms.ToTensor(),
             normalize,
         ])),
-        batch_size=128, shuffle=False,
+        batch_size=128, shuffle=True,
         num_workers=4, pin_memory=True)
 
 
@@ -126,9 +120,9 @@ class ModelWithTemperature(nn.Module):
         NB: Output of the neural network should be the classification logits,
             NOT the softmax (or log softmax)!
     """
-    def __init__(self, models):
+    def __init__(self, model):
         super(ModelWithTemperature, self).__init__()
-        self.models = models
+        self.model = model
         self.temperature = nn.Parameter(torch.ones(10) * 1.5)
 
     def forward(self, input):
@@ -154,8 +148,6 @@ class ModelWithTemperature(nn.Module):
         """
         self.cuda()
         nll_criterion = nn.CrossEntropyLoss().cuda()
-        ece_criterion = _ECELoss().cuda()
-
 
         # First: collect all the logits and labels for the validation set
         logits_list = []
@@ -163,49 +155,38 @@ class ModelWithTemperature(nn.Module):
         with torch.no_grad():
             for input, label in valid_loader:
                 input = input.cuda()
-                logits = []
-                for model in self.models:
-                    logits_i = model(input)
-                    if len(logits)==0:
-                        logits = logits_i.unsqueeze(axis=0)
-                    else:
-                        logits = torch.cat([logits, logits_i.unsqueeze(axis=0)], axis=0)
-                logits = logits.mean(axis=0)
-
+                logits = self.model(input)
                 logits_list.append(logits)
                 labels_list.append(label)
             logits = torch.cat(logits_list).cuda()
             labels = torch.cat(labels_list).cuda()
 
         # Calculate NLL and ECE before temperature scaling
-        before_temperature_nll = ece_criterion(logits, labels).item()
-        print('Before temperature - ECE: %.3f' % (before_temperature_nll))
+        before_temperature_nll = nll_criterion(logits, labels).item()
+        print('Before temperature - NLL: %.3f' % (before_temperature_nll))
 
         # Next: optimize the temperature w.r.t. NLL
-        optimizer = optim.LBFGS([self.temperature], lr=0.001, max_iter=500)
+        optimizer = optim.LBFGS([self.temperature], lr=0.01, max_iter=1000)
 
         def eval():
             optimizer.zero_grad()
-            loss = ece_criterion(self.temperature_scale(logits), labels)
+            loss = nll_criterion(self.temperature_scale(logits), labels)
             loss.backward()
             return loss
         optimizer.step(eval)
 
         # Calculate NLL and ECE after temperature scaling
-        after_temperature_nll = ece_criterion(self.temperature_scale(logits), labels).item()
+        after_temperature_nll = nll_criterion(self.temperature_scale(logits), labels).item()
         # print('Optimal temperature: %.3f' % self.temperature)
         print(self.temperature)
-        print('After temperature - ECE: %.3f' % (after_temperature_nll))
+        print('After temperature - NLL: %.3f' % (after_temperature_nll))
 
         return self.temperature
 
-best_temperature = ModelWithTemperature(models).set_temperature(val_loader)
-
-if not os.path.exists("data/"+args.run_name_prefix+"_ensemble_eval/"):
-    os.makedirs("data/"+args.run_name_prefix+"_ensemble_eval/")
+best_temperature = ModelWithTemperature(model).set_temperature(val_loader)
 
 if args.corruption_type == "":
-    np.save("data/"+args.run_name_prefix+"_ensemble_eval/best_temp.npy", best_temperature.detach().cpu().numpy())
+    np.save("data/"+args.run_name+"/best_temp.npy", best_temperature.detach().cpu().numpy())
 else:
-    np.save("data/"+args.run_name_prefix+"_ensemble_eval/best_temp_"+args.corruption_type+"_"+str(args.corruption_level)+".npy", best_temperature.detach().cpu().numpy())
+    np.save("data/"+args.run_name+"/best_temp_"+args.corruption_type+"_"+str(args.corruption_level)+".npy", best_temperature.detach().cpu().numpy())
 

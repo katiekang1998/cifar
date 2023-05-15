@@ -41,6 +41,7 @@ else:
     model = torch.nn.DataParallel(resnet.__dict__['resnet20'](11))
 model.cuda()
 
+
 print("=> loading checkpoint '{}'".format(checkpoint_name))
 checkpoint = torch.load(checkpoint_name)
 start_epoch = checkpoint['epoch']

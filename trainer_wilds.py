@@ -125,7 +125,7 @@ def main():
 
     best_loss = 1000000
 
-    for epoch in range(0, 200):
+    for epoch in range(0, 50):
 
         # train for one epoch
         print('current lr {:.5e}'.format(optimizer.param_groups[0]['lr']))
@@ -150,17 +150,12 @@ def main():
                 'epoch': epoch + 1,
                 'state_dict': model.state_dict(),
                 'best_prec1': best_loss,
-            }, is_best, filename=os.path.join("data", args.save_dir, 'checkpoint.th'))
-
-        save_checkpoint({
-            'state_dict': model.state_dict(),
-            'best_prec1': best_loss,
-        }, is_best, filename=os.path.join("data", args.save_dir, 'model.th'))
+            }, is_best, filename=os.path.join("data", args.save_dir))
 
 
 def train(train_loader, model, criterion, criterion2, optimizer, epoch):
     """
-        Run one train epoch
+        Run one train epoch 
     """
     batch_time = AverageMeter()
     data_time = AverageMeter()
@@ -280,7 +275,9 @@ def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
     """
     Save the training model
     """
-    torch.save(state, filename)
+    torch.save(state, os.path.join(filename,  'checkpoint.th'))
+    if is_best:
+        torch.save(state, os.path.join(filename,  'best.th'))
 
 class AverageMeter(object):
     """Computes and stores the average and current value"""

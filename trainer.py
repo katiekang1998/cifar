@@ -90,7 +90,7 @@ def main():
     if not os.path.exists(os.path.join("data", args.save_dir)):
         os.makedirs(os.path.join("data", args.save_dir))
 
-    model = torch.nn.DataParallel(resnet.__dict__[args.arch]())
+    model = torch.nn.DataParallel(resnet.__dict__[args.arch](num_classes=11))
     model.cuda()
 
     # optionally resume from a checkpoint

@@ -35,6 +35,7 @@ parser.add_argument('--save-every', dest='save_every',
                     help='Saves checkpoints at every specified number of epochs',
                     type=int, default=1)
 
+
 class MultipleDomainDataset:
     N_STEPS = 5001           # Default, subclasses may override
     CHECKPOINT_FREQ = 100    # Default, subclasses may override
@@ -180,7 +181,7 @@ def main():
         batch_size=32, shuffle=True,
         num_workers=args.workers, pin_memory=True)
     
-    model = torch.nn.DataParallel(Network(datasets_all.input_shape, datasets_all.num_classes))
+    model = torch.nn.DataParallel(Network(datasets_all.input_shape, datasets_all.num_classes+1))
     model.cuda()
     
     optimizer = torch.optim.Adam(
